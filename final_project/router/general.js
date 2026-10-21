@@ -1,43 +1,60 @@
 const express = require('express');
-let books = require("./booksdb.js");
-let isValid = require("./auth_users.js").isValid;
-let users = require("./auth_users.js").users;
+const axios = require('axios');
+const books = require('./booksdb.js');
+const isValid = require('./auth_users.js').isValid;
+const users = require('./auth_users.js').users;
 const public_users = express.Router();
 
+// Axios client helpers used by the project to retrieve data through the API.
+const API_BASE_URL = process.env.BOOK_API_URL || 'http://localhost:5000';
+const getAllBooks = async () => (await axios.get(`${API_BASE_URL}/`)).data;
+const getBookByISBN = async (isbn) =>
+  (await axios.get(`${API_BASE_URL}/isbn/${encodeURIComponent(isbn)}`)).data;
+const getBooksByAuthor = async (author) =>
+  (await axios.get(`${API_BASE_URL}/author/${encodeURIComponent(author)}`)).data;
+const getBooksByTitle = async (title) =>
+  (await axios.get(`${API_BASE_URL}/title/${encodeURIComponent(title)}`)).data;
 
-public_users.post("/register", (req,res) => {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.post('/register', (req, res) => {
+  const { username, password } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) {
+    return res.status(400).json({ message: 'A non-empty password is required' });
+  }
+  if (!isValid(username)) {
+    return res.status(409).json({ message: 'Username is required or already registered' });
+  }
+  users.push({ username: username.trim(), password });
+  return res.status(201).json({ message: 'User successfully registered' });
 });
 
-// Get the book list available in the shop
-public_users.get('/',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.get('/', (req, res) => res.status(200).json(books));
+
+public_users.get('/isbn/:isbn', (req, res) => {
+  const book = books[req.params.isbn];
+  return book ? res.status(200).json(book) : res.status(404).json({ message: 'Book not found' });
 });
 
-// Get book details based on ISBN
-public_users.get('/isbn/:isbn',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
- });
-  
-// Get book details based on author
-public_users.get('/author/:author',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.get('/author/:author', (req, res) => {
+  const author = req.params.author.toLocaleLowerCase();
+  const matches = Object.fromEntries(Object.entries(books).filter(([, book]) =>
+    book.author.toLocaleLowerCase().includes(author)));
+  return res.status(200).json(matches);
 });
 
-// Get all books based on title
-public_users.get('/title/:title',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.get('/title/:title', (req, res) => {
+  const title = req.params.title.toLocaleLowerCase();
+  const matches = Object.fromEntries(Object.entries(books).filter(([, book]) =>
+    book.title.toLocaleLowerCase().includes(title)));
+  return res.status(200).json(matches);
 });
 
-//  Get book review
-public_users.get('/review/:isbn',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.get('/review/:isbn', (req, res) => {
+  const book = books[req.params.isbn];
+  return book ? res.status(200).json(book.reviews) : res.status(404).json({ message: 'Book not found' });
 });
 
 module.exports.general = public_users;
+module.exports.getAllBooks = getAllBooks;
+module.exports.getBookByISBN = getBookByISBN;
+module.exports.getBooksByAuthor = getBooksByAuthor;
+module.exports.getBooksByTitle = getBooksByTitle;
